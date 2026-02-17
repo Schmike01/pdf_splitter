@@ -1,0 +1,2510 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Splitter</title>
+    <!-- PDF.js library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <!-- pdf-lib for PDF manipulation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <!-- FileSaver.js for saving files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        /* Base Styles */
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --background-color: #f8f9fa;
+            --text-color: #333;
+            --border-color: #ddd;
+            --success-color: #2ecc71;
+            --warning-color: #f39c12;
+            --error-color: #e74c3c;
+            --shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            --border-radius: 8px;
+            --font-size-small: 0.875rem;
+            --font-size-base: 1rem;
+            --font-size-large: 1.25rem;
+            --transition: all 0.3s ease;
+        }
+
+        /* High Contrast Mode */
+        .high-contrast {
+            --primary-color: #000;
+            --secondary-color: #fff;
+            --accent-color: #ff0;
+            --background-color: #000;
+            --text-color: #fff;
+            --border-color: #fff;
+            --success-color: #0f0;
+            --warning-color: #ff0;
+            --error-color: #f00;
+            --shadow: 0 2px 5px rgba(255, 255, 255, 0.2);
+        }
+
+        /* Large Text Mode */
+        .large-text {
+            --font-size-small: 1.125rem;
+            --font-size-base: 1.25rem;
+            --font-size-large: 1.5rem;
+        }
+
+        /* Reset and Base Styles */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: var(--font-size-base);
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+            transition: var(--transition);
+        }
+
+        h1, h2, h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+        }
+
+        button {
+            cursor: pointer;
+            font-size: var(--font-size-base);
+            padding: 0.5rem 1rem;
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            background-color: #fff;
+            color: var(--text-color);
+            transition: var(--transition);
+        }
+
+        button:hover {
+            background-color: var(--secondary-color);
+            color: white;
+        }
+
+        input[type="text"], input[type="file"] {
+            font-size: var(--font-size-base);
+            padding: 0.5rem;
+            border-radius: var(--border-radius);
+            border: 1px solid var(--border-color);
+            width: 100%;
+        }
+
+        /* Accessibility Controls */
+        .accessibility-controls {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            display: flex;
+            gap: 8px;
+        }
+
+        .accessibility-controls button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .accessibility-controls .icon {
+            font-size: 1.2rem;
+        }
+
+        /* Layout */
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        header h1 {
+            color: white;
+            margin-bottom: 1rem;
+        }
+
+        main {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        footer {
+            text-align: center;
+            padding: 1rem;
+            background-color: var(--primary-color);
+            color: white;
+            margin-top: 2rem;
+        }
+
+        /* Navigation Tabs */
+        .tabs {
+            display: flex;
+            list-style: none;
+            overflow-x: auto;
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .tab {
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+            color: rgba(255, 255, 255, 0.7);
+        }
+
+        .tab:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .tab.active {
+            border-bottom: 2px solid white;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 1rem 0;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Upload Area */
+        .upload-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        #drop-area, #batch-drop-area {
+            border: 2px dashed var(--border-color);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        #drop-area.highlight, #batch-drop-area.highlight {
+            border-color: var(--secondary-color);
+            background-color: rgba(52, 152, 219, 0.1);
+        }
+
+        .upload-form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-input-label {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            border-radius: var(--border-radius);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .file-input-label:hover {
+            background-color: #2980b9;
+        }
+
+        .drop-message {
+            color: var(--text-color);
+            opacity: 0.7;
+            margin-top: 1rem;
+        }
+
+        .upload-status {
+            margin-top: 1rem;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: var(--border-color);
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: var(--secondary-color);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+
+        /* Preview Section */
+        .preview-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .file-info {
+            background-color: white;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+
+        .selection-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            background-color: white;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            align-items: center;
+        }
+
+        .selection-count {
+            font-weight: 600;
+            color: var(--secondary-color);
+            padding: 0.5rem 1rem;
+            background-color: rgba(52, 152, 219, 0.1);
+            border-radius: var(--border-radius);
+            border: 1px solid var(--secondary-color);
+            white-space: nowrap;
+        }
+
+        .selection-count.has-selection {
+            background-color: var(--secondary-color);
+            color: white;
+            animation: pulse 0.3s ease-out;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.05);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .button-group {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .range-selection {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 0.5rem;
+            flex-grow: 1;
+        }
+
+        .range-selection input {
+            flex-grow: 1;
+        }
+
+        .thumbnail-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background-color: white;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+
+        .thumbnails-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .thumbnail-item {
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+            transition: var(--transition);
+            cursor: pointer;
+            position: relative;
+            border: 3px solid transparent;
+        }
+
+        .thumbnail-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .thumbnail-item.selected {
+            border-color: var(--secondary-color);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.3);
+        }
+
+        .thumbnail-item.selected::after {
+            content: '✓';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background-color: var(--secondary-color);
+            color: white;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 16px;
+            z-index: 10;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .thumbnail-image {
+            width: 100%;
+            height: 200px;
+            object-fit: contain;
+            background-color: #f1f1f1;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .thumbnail-footer {
+            padding: 0.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .page-number {
+            font-size: var(--font-size-small);
+        }
+
+        .page-checkbox {
+            transform: scale(1.2);
+        }
+
+        /* Split Section */
+        .split-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .output-options {
+            background-color: white;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .output-format, .naming-option {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .primary-button {
+            background-color: var(--secondary-color);
+            color: white;
+            padding: 0.8rem 1.5rem;
+            font-weight: bold;
+        }
+
+        .primary-button:hover {
+            background-color: #2980b9;
+        }
+
+        .download-container {
+            background-color: white;
+            padding: 1rem;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-top: 1rem;
+        }
+
+        .download-link {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem;
+            background-color: #f8f9fa;
+            border-radius: var(--border-radius);
+            margin-bottom: 0.5rem;
+            transition: var(--transition);
+        }
+
+        .download-link:hover {
+            background-color: #e9ecef;
+        }
+
+        /* Batch Processing */
+        .batch-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .batch-files-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 1rem;
+        }
+
+        .batch-file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem;
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+
+        .batch-file-info {
+            flex-grow: 1;
+        }
+
+        .batch-file-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .batch-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .batch-results {
+            margin-top: 1rem;
+        }
+
+        .batch-result-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem;
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            margin-bottom: 0.5rem;
+        }
+
+        .batch-status {
+            padding: 1rem;
+            background-color: white;
+            border-radius: var(--border-radius);
+            margin-top: 1rem;
+        }
+
+        /* Batch File Preview */
+        .batch-preview-container {
+            margin-top: 1rem;
+            background-color: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+            padding: 1rem;
+            display: none;
+        }
+
+        .batch-preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .batch-preview-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .batch-selection-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .batch-thumbnails-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        /* Modal Styles */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            max-width: 90%;
+            max-height: 90%;
+            overflow: auto;
+            position: relative;
+        }
+
+        /* Loading animation for thumbnails */
+        .thumbnail-placeholder.loading {
+            background: linear-gradient(90deg, #f1f1f1 25%, #e0e0e0 50%, #f1f1f1 75%);
+            background-size: 200% 100%;
+            animation: loading 1.5s ease-in-out infinite;
+        }
+
+        @keyframes loading {
+            0% {
+                background-position: 200% 0;
+            }
+            100% {
+                background-position: -200% 0;
+            }
+        }
+
+        /* Performance indicator */
+        .performance-info {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: var(--border-radius);
+            font-size: var(--font-size-small);
+            z-index: 999;
+            display: none;
+        }
+
+        .performance-info.show {
+            display: block;
+        }
+
+        /* Responsive Adjustments */
+        @media (max-width: 768px) {
+            .selection-controls, .batch-selection-controls {
+                flex-direction: column;
+            }
+            
+            .button-group {
+                width: 100%;
+            }
+            
+            .range-selection {
+                width: 100%;
+            }
+            
+            .thumbnails-container, .batch-thumbnails-container {
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            }
+            
+            .thumbnail-image {
+                height: 150px;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .batch-file-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .batch-file-actions {
+                margin-top: 0.5rem;
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .tabs {
+                justify-content: flex-start;
+            }
+            
+            .tab {
+                padding: 0.5rem;
+                font-size: var(--font-size-small);
+            }
+            
+            .thumbnails-container, .batch-thumbnails-container {
+                grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            }
+            
+            .thumbnail-image {
+                height: 120px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="accessibility-controls">
+        <button id="high-contrast-toggle" aria-label="Toggle high contrast mode">
+            <span class="icon">🌓</span>
+        </button>
+        <button id="large-text-toggle" aria-label="Toggle large text mode">
+            <span class="icon">A</span>
+        </button>
+    </div>
+
+    <header>
+        <h1>PDF Splitter</h1>
+        <nav>
+            <ul class="tabs">
+                <li class="tab active" data-tab="upload">Upload</li>
+                <li class="tab" data-tab="preview">Preview & Select</li>
+                <li class="tab" data-tab="split">Split & Download</li>
+                <li class="tab" data-tab="batch">Batch Processing</li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        <section id="upload" class="tab-content active">
+            <div class="upload-container">
+                <div id="drop-area">
+                    <form class="upload-form">
+                        <p>Upload your PDF file using the button below or by dragging and dropping</p>
+                        <input type="file" id="file-input" accept=".pdf" aria-label="Upload PDF file">
+                        <label for="file-input" class="file-input-label">Choose PDF file</label>
+                        <div class="drop-message">or drop PDF here</div>
+                    </form>
+                </div>
+                <div class="upload-status" aria-live="polite">
+                    <div id="upload-progress" class="progress-bar">
+                        <div class="progress-fill"></div>
+                    </div>
+                    <p id="upload-message"></p>
+                </div>
+            </div>
+        </section>
+
+        <section id="preview" class="tab-content">
+            <div class="preview-container">
+                <div class="file-info">
+                    <h2>File Information</h2>
+                    <p>Filename: <span id="filename-display">No file selected</span></p>
+                    <p>Pages: <span id="page-count">0</span></p>
+                </div>
+                
+                <div class="selection-controls">
+                    <div class="selection-count" id="selection-count">
+                        <span id="selection-count-text">0 of 0 pages selected</span>
+                    </div>
+                    <div class="button-group">
+                        <button id="select-all" class="action-button">Select All</button>
+                        <button id="deselect-all" class="action-button">Deselect All</button>
+                    </div>
+                    <div class="range-selection">
+                        <label for="page-range">Page Range:</label>
+                        <input type="text" id="page-range" placeholder="e.g. 1-3, 5, 7-9">
+                        <button id="apply-range" class="action-button">Apply Range</button>
+                    </div>
+                </div>
+                
+                <div class="thumbnail-controls">
+                    <label for="thumbnail-size">Thumbnail Size:</label>
+                    <input type="range" id="thumbnail-size" min="1" max="3" value="2">
+                </div>
+                
+                <div id="thumbnails-container" class="thumbnails-container">
+                    <!-- Thumbnails will be inserted here by JavaScript -->
+                </div>
+            </div>
+        </section>
+
+        <section id="split" class="tab-content">
+            <div class="split-container">
+                <div class="output-options">
+                    <h2>Output Options</h2>
+                    
+                    <div class="output-format">
+                        <label>Output Format:</label>
+                        <div class="radio-group">
+                            <input type="radio" id="format-pdf" name="output-format" value="pdf" checked>
+                            <label for="format-pdf">PDF</label>
+                            
+                            <input type="radio" id="format-text" name="output-format" value="text">
+                            <label for="format-text">Text</label>
+                        </div>
+                    </div>
+                    
+                    <div class="naming-option">
+                        <label for="output-filename">Output Filename:</label>
+                        <input type="text" id="output-filename" placeholder="Same as original">
+                    </div>
+                </div>
+                
+                <div class="action-buttons">
+                    <button id="split-button" class="primary-button">Split PDF</button>
+                    <button id="extract-text-button" class="primary-button">Extract Text</button>
+                </div>
+                
+                <div id="processing-status" class="processing-status" aria-live="polite"></div>
+                
+                <div id="download-container" class="download-container">
+                    <h3>Download Files</h3>
+                    <!-- Download links will appear here -->
+                </div>
+            </div>
+        </section>
+
+        <section id="batch" class="tab-content">
+            <div class="batch-container">
+                <h2>Batch Processing</h2>
+                <p>Upload multiple PDF files for batch processing. You can view and select pages from each file.</p>
+                
+                <div id="batch-drop-area">
+                    <form class="upload-form">
+                        <input type="file" id="batch-file-input" accept=".pdf" multiple aria-label="Upload multiple PDF files">
+                        <label for="batch-file-input" class="file-input-label">Choose PDF files</label>
+                        <div class="drop-message">or drop PDFs here</div>
+                    </form>
+                </div>
+                
+                <div id="batch-files-list" class="batch-files-list">
+                    <!-- Batch files will be listed here -->
+                </div>
+                
+                <!-- Batch file preview section -->
+                <div id="batch-preview-container" class="batch-preview-container">
+                    <div class="batch-preview-header">
+                        <h3 id="batch-preview-title">File Preview</h3>
+                        <button id="batch-preview-close" class="batch-preview-close">&times;</button>
+                    </div>
+                    
+                    <div class="batch-selection-controls">
+                        <div class="selection-count" id="batch-selection-count">
+                            <span id="batch-selection-count-text">0 of 0 pages selected</span>
+                        </div>
+                        <div class="button-group">
+                            <button id="batch-select-all" class="action-button">Select All</button>
+                            <button id="batch-deselect-all" class="action-button">Deselect All</button>
+                        </div>
+                        <div class="range-selection">
+                            <label for="batch-page-range">Page Range:</label>
+                            <input type="text" id="batch-page-range" placeholder="e.g. 1-3, 5, 7-9">
+                            <button id="batch-apply-range" class="action-button">Apply Range</button>
+                        </div>
+                    </div>
+                    
+                    <div id="batch-thumbnails-container" class="batch-thumbnails-container">
+                        <!-- Batch file thumbnails will be inserted here -->
+                    </div>
+                </div>
+                
+                <div class="batch-actions">
+                    <button id="batch-split" class="primary-button">Split Selected Files</button>
+                    <button id="batch-extract-text" class="primary-button">Extract Text from Selected Files</button>
+                </div>
+                
+                <div id="batch-status" class="batch-status" aria-live="polite"></div>
+                
+                <div id="batch-results" class="batch-results">
+                    <h3>Batch Results</h3>
+                    <!-- Batch results will appear here -->
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>PDF Splitter - Client-side PDF processing</p>
+    </footer>
+
+    <div id="performance-info" class="performance-info"></div>
+
+    <script>
+        // Initialize PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
+
+        // App state
+        const appState = {
+            currentPdf: null,
+            currentFile: null,
+            pageCount: 0,
+            selectedPages: new Set(),
+            thumbnailSize: 2, // Default medium size
+            pdfDocument: null,
+            batchFiles: [], // For batch processing
+            batchSelectedPages: {}, // Map of file index to Set of selected pages
+            currentBatchFileIndex: null, // Currently previewed batch file
+            thumbnailCache: new Map(), // Cache for rendered thumbnails
+            batchThumbnailCache: new Map(), // Cache for batch thumbnails
+            blobUrls: new Set(), // Track blob URLs for cleanup
+            renderQueue: [], // Queue for thumbnail rendering
+            isRendering: false, // Flag to track if rendering is in progress
+            maxConcurrentRenders: 3, // Maximum concurrent renders
+            activeRenders: 0, // Current number of active renders
+            intersectionObserver: null, // Intersection Observer for lazy loading
+            batchIntersectionObserver: null // Intersection Observer for batch lazy loading
+        };
+
+        // DOM Elements
+        const elements = {
+            // Tabs
+            tabs: document.querySelectorAll('.tab'),
+            tabContents: document.querySelectorAll('.tab-content'),
+            
+            // Upload section
+            dropArea: document.getElementById('drop-area'),
+            fileInput: document.getElementById('file-input'),
+            uploadProgress: document.getElementById('upload-progress'),
+            progressFill: document.querySelector('.progress-fill'),
+            uploadMessage: document.getElementById('upload-message'),
+            
+            // Preview section
+            filenameDisplay: document.getElementById('filename-display'),
+            pageCount: document.getElementById('page-count'),
+            selectAll: document.getElementById('select-all'),
+            deselectAll: document.getElementById('deselect-all'),
+            pageRange: document.getElementById('page-range'),
+            applyRange: document.getElementById('apply-range'),
+            thumbnailSize: document.getElementById('thumbnail-size'),
+            thumbnailsContainer: document.getElementById('thumbnails-container'),
+            selectionCount: document.getElementById('selection-count'),
+            selectionCountText: document.getElementById('selection-count-text'),
+            
+            // Split section
+            outputFormat: document.getElementsByName('output-format'),
+            outputFilename: document.getElementById('output-filename'),
+            splitButton: document.getElementById('split-button'),
+            extractTextButton: document.getElementById('extract-text-button'),
+            processingStatus: document.getElementById('processing-status'),
+            downloadContainer: document.getElementById('download-container'),
+            
+            // Batch section
+            batchDropArea: document.getElementById('batch-drop-area'),
+            batchFileInput: document.getElementById('batch-file-input'),
+            batchFilesList: document.getElementById('batch-files-list'),
+            batchSplit: document.getElementById('batch-split'),
+            batchExtractText: document.getElementById('batch-extract-text'),
+            batchStatus: document.getElementById('batch-status'),
+            batchResults: document.getElementById('batch-results'),
+            
+            // Batch preview section
+            batchPreviewContainer: document.getElementById('batch-preview-container'),
+            batchPreviewTitle: document.getElementById('batch-preview-title'),
+            batchPreviewClose: document.getElementById('batch-preview-close'),
+            batchSelectAll: document.getElementById('batch-select-all'),
+            batchDeselectAll: document.getElementById('batch-deselect-all'),
+            batchPageRange: document.getElementById('batch-page-range'),
+            batchApplyRange: document.getElementById('batch-apply-range'),
+            batchThumbnailsContainer: document.getElementById('batch-thumbnails-container'),
+            batchSelectionCount: document.getElementById('batch-selection-count'),
+            batchSelectionCountText: document.getElementById('batch-selection-count-text'),
+            
+            // Accessibility
+            highContrastToggle: document.getElementById('high-contrast-toggle'),
+            largeTextToggle: document.getElementById('large-text-toggle')
+        };
+
+        // Initialize the application
+        function initApp() {
+            // Set up event listeners
+            setupTabNavigation();
+            setupFileUpload();
+            setupPageSelection();
+            setupOutputOptions();
+            setupBatchProcessing();
+            setupAccessibilityControls();
+
+            // Check for stored preferences
+            loadAccessibilityPreferences();
+
+            // Initialize Intersection Observers
+            setupIntersectionObservers();
+        }
+
+        // Setup Intersection Observers for lazy loading
+        function setupIntersectionObservers() {
+            // Observer for main thumbnails
+            const observerOptions = {
+                root: null,
+                rootMargin: '200px', // Load thumbnails 200px before they enter viewport
+                threshold: 0.01
+            };
+
+            appState.intersectionObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const thumbnailItem = entry.target;
+                        const pageNum = parseInt(thumbnailItem.getAttribute('data-page'));
+
+                        // Only render if not already rendered
+                        if (!appState.thumbnailCache.has(pageNum)) {
+                            queueThumbnailRender(pageNum, thumbnailItem, false);
+                        }
+
+                        // Stop observing once loaded
+                        appState.intersectionObserver.unobserve(thumbnailItem);
+                    }
+                });
+            }, observerOptions);
+
+            // Observer for batch thumbnails
+            appState.batchIntersectionObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const thumbnailItem = entry.target;
+                        const pageNum = parseInt(thumbnailItem.getAttribute('data-page'));
+                        const fileIndex = appState.currentBatchFileIndex;
+                        const cacheKey = `${fileIndex}-${pageNum}`;
+
+                        // Only render if not already rendered
+                        if (!appState.batchThumbnailCache.has(cacheKey)) {
+                            queueThumbnailRender(pageNum, thumbnailItem, true);
+                        }
+
+                        // Stop observing once loaded
+                        appState.batchIntersectionObserver.unobserve(thumbnailItem);
+                    }
+                });
+            }, observerOptions);
+        }
+
+        // Queue thumbnail for rendering with throttling
+        function queueThumbnailRender(pageNum, container, isBatch) {
+            appState.renderQueue.push({ pageNum, container, isBatch });
+            processRenderQueue();
+        }
+
+        // Process render queue with concurrency limit
+        async function processRenderQueue() {
+            if (appState.isRendering && appState.activeRenders >= appState.maxConcurrentRenders) {
+                return; // Already at max capacity
+            }
+
+            appState.isRendering = true;
+
+            while (appState.renderQueue.length > 0 && appState.activeRenders < appState.maxConcurrentRenders) {
+                const task = appState.renderQueue.shift();
+                appState.activeRenders++;
+
+                // Render thumbnail asynchronously
+                if (task.isBatch) {
+                    renderBatchThumbnail(appState.currentBatchFileIndex, task.pageNum, task.container)
+                        .finally(() => {
+                            appState.activeRenders--;
+                            processRenderQueue();
+                        });
+                } else {
+                    renderThumbnail(task.pageNum, task.container)
+                        .finally(() => {
+                            appState.activeRenders--;
+                            processRenderQueue();
+                        });
+                }
+            }
+
+            if (appState.renderQueue.length === 0 && appState.activeRenders === 0) {
+                appState.isRendering = false;
+            }
+        }
+
+        // Cleanup blob URLs to prevent memory leaks
+        function cleanupBlobUrls() {
+            appState.blobUrls.forEach(url => {
+                URL.revokeObjectURL(url);
+            });
+            appState.blobUrls.clear();
+        }
+
+        // Clear thumbnail caches
+        function clearThumbnailCaches() {
+            cleanupBlobUrls();
+            appState.thumbnailCache.clear();
+            appState.batchThumbnailCache.clear();
+        }
+
+        // Show performance info
+        function showPerformanceInfo(message) {
+            const perfInfo = document.getElementById('performance-info');
+            if (perfInfo) {
+                perfInfo.textContent = message;
+                perfInfo.classList.add('show');
+
+                // Auto-hide after 3 seconds
+                setTimeout(() => {
+                    perfInfo.classList.remove('show');
+                }, 3000);
+            }
+        }
+
+        // Update selection count display
+        function updateSelectionCount() {
+            const selectedCount = appState.selectedPages.size;
+            const totalCount = appState.pageCount;
+
+            if (elements.selectionCountText) {
+                elements.selectionCountText.textContent = `${selectedCount} of ${totalCount} pages selected`;
+            }
+
+            if (elements.selectionCount) {
+                if (selectedCount > 0) {
+                    elements.selectionCount.classList.add('has-selection');
+                } else {
+                    elements.selectionCount.classList.remove('has-selection');
+                }
+            }
+        }
+
+        // Update batch selection count display
+        function updateBatchSelectionCount() {
+            if (appState.currentBatchFileIndex === null) return;
+
+            const fileIndex = appState.currentBatchFileIndex;
+            const batchFile = appState.batchFiles[fileIndex];
+            const selectedCount = appState.batchSelectedPages[fileIndex] ?
+                appState.batchSelectedPages[fileIndex].size : 0;
+            const totalCount = batchFile.pageCount;
+
+            if (elements.batchSelectionCountText) {
+                elements.batchSelectionCountText.textContent = `${selectedCount} of ${totalCount} pages selected`;
+            }
+
+            if (elements.batchSelectionCount) {
+                if (selectedCount > 0) {
+                    elements.batchSelectionCount.classList.add('has-selection');
+                } else {
+                    elements.batchSelectionCount.classList.remove('has-selection');
+                }
+            }
+        }
+
+        // Update thumbnail visual selection state
+        function updateThumbnailSelection(pageNum, isSelected) {
+            const thumbnailItem = document.querySelector(`.thumbnail-item[data-page="${pageNum}"]`);
+            if (thumbnailItem) {
+                if (isSelected) {
+                    thumbnailItem.classList.add('selected');
+                } else {
+                    thumbnailItem.classList.remove('selected');
+                }
+            }
+        }
+
+        // Update batch thumbnail visual selection state
+        function updateBatchThumbnailSelection(pageNum, isSelected) {
+            const thumbnailItems = elements.batchThumbnailsContainer.querySelectorAll('.thumbnail-item');
+            thumbnailItems.forEach(item => {
+                const itemPageNum = parseInt(item.getAttribute('data-page'));
+                if (itemPageNum === pageNum) {
+                    if (isSelected) {
+                        item.classList.add('selected');
+                    } else {
+                        item.classList.remove('selected');
+                    }
+                }
+            });
+        }
+
+        // Tab Navigation
+        function setupTabNavigation() {
+            elements.tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    // Deactivate all tabs
+                    elements.tabs.forEach(t => t.classList.remove('active'));
+                    elements.tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    // Activate selected tab
+                    tab.classList.add('active');
+                    const tabId = tab.getAttribute('data-tab');
+                    document.getElementById(tabId).classList.add('active');
+                    
+                    // Hide batch preview when switching tabs
+                    if (tabId !== 'batch') {
+                        elements.batchPreviewContainer.style.display = 'none';
+                    }
+                });
+            });
+        }
+
+        // File Upload Section
+        function setupFileUpload() {
+            // File input change
+            elements.fileInput.addEventListener('change', handleFileSelection);
+            
+            // Drag and drop functionality
+            elements.dropArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                elements.dropArea.classList.add('highlight');
+            });
+            
+            elements.dropArea.addEventListener('dragleave', () => {
+                elements.dropArea.classList.remove('highlight');
+            });
+            
+            elements.dropArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                elements.dropArea.classList.remove('highlight');
+                
+                if (e.dataTransfer.files.length) {
+                    handleFileSelection({ target: { files: e.dataTransfer.files } });
+                }
+            });
+        }
+
+        // Handle file selection (either through input or drop)
+        function handleFileSelection(event) {
+            const file = event.target.files[0];
+            
+            if (file && file.type === 'application/pdf') {
+                appState.currentFile = file;
+                loadPdf(file);
+            } else {
+                showMessage('Please select a valid PDF file.', 'error');
+            }
+        }
+
+        // Load PDF file
+        async function loadPdf(file) {
+            try {
+                // Clear previous caches and cleanup
+                clearThumbnailCaches();
+
+                // Update UI
+                elements.filenameDisplay.textContent = file.name;
+                showProgress(0);
+                showMessage('Loading PDF...', 'info');
+
+                // Read the file
+                const arrayBuffer = await readFileAsArrayBuffer(file);
+
+                // Load PDF document
+                const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+
+                loadingTask.onProgress = (progressData) => {
+                    if (progressData.total > 0) {
+                        const percent = (progressData.loaded / progressData.total) * 100;
+                        showProgress(percent);
+                    }
+                };
+
+                appState.pdfDocument = await loadingTask.promise;
+                appState.pageCount = appState.pdfDocument.numPages;
+
+                // Update UI
+                elements.pageCount.textContent = appState.pageCount;
+                showMessage(`PDF loaded successfully. ${appState.pageCount} pages found.`, 'success');
+                showProgress(100);
+
+                // Reset selected pages
+                appState.selectedPages = new Set();
+
+                // Generate thumbnails with lazy loading
+                generateThumbnails();
+
+                // Switch to preview tab
+                setTimeout(() => {
+                    document.querySelector('[data-tab="preview"]').click();
+                }, 500);
+
+            } catch (error) {
+                console.error('Error loading PDF:', error);
+                showMessage('Error loading PDF: ' + error.message, 'error');
+            }
+        }
+
+        // Read file as ArrayBuffer
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // Show upload progress
+        function showProgress(percent) {
+            elements.progressFill.style.width = `${percent}%`;
+        }
+
+        // Show message in upload area
+        function showMessage(message, type = 'info') {
+            elements.uploadMessage.textContent = message;
+            elements.uploadMessage.className = `message ${type}`;
+        }
+
+        // Page Selection Section
+        function setupPageSelection() {
+            // Select/Deselect All buttons
+            elements.selectAll.addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('.page-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = true;
+                    const pageNum = parseInt(checkbox.getAttribute('data-page'));
+                    appState.selectedPages.add(pageNum);
+                    updateThumbnailSelection(pageNum, true);
+                });
+                updateSelectionCount();
+            });
+
+            elements.deselectAll.addEventListener('click', () => {
+                const checkboxes = document.querySelectorAll('.page-checkbox');
+                checkboxes.forEach(checkbox => {
+                    checkbox.checked = false;
+                    const pageNum = parseInt(checkbox.getAttribute('data-page'));
+                    appState.selectedPages.delete(pageNum);
+                    updateThumbnailSelection(pageNum, false);
+                });
+                updateSelectionCount();
+            });
+            
+            // Apply Range button
+            elements.applyRange.addEventListener('click', () => applyPageRange());
+            
+            // Thumbnail size slider
+            elements.thumbnailSize.addEventListener('input', (e) => {
+                appState.thumbnailSize = parseInt(e.target.value);
+                updateThumbnailSize();
+            });
+            
+            // Batch preview selection controls
+            elements.batchSelectAll.addEventListener('click', batchSelectAll);
+            elements.batchDeselectAll.addEventListener('click', batchDeselectAll);
+            elements.batchApplyRange.addEventListener('click', applyBatchPageRange);
+            elements.batchPreviewClose.addEventListener('click', () => {
+                elements.batchPreviewContainer.style.display = 'none';
+            });
+        }
+
+        // Generate thumbnails for all pages with lazy loading
+        async function generateThumbnails() {
+            // Clear previous thumbnails
+            elements.thumbnailsContainer.innerHTML = '';
+
+            const startTime = performance.now();
+
+            // Generate placeholder thumbnails for each page
+            for (let i = 1; i <= appState.pageCount; i++) {
+                const thumbnailItem = document.createElement('div');
+                thumbnailItem.className = 'thumbnail-item';
+                thumbnailItem.setAttribute('data-page', i);
+                thumbnailItem.innerHTML = `
+                    <div class="thumbnail-placeholder loading" style="height: 200px; display: flex; align-items: center; justify-content: center;">
+                        <span style="color: #999;">Page ${i}</span>
+                    </div>
+                    <div class="thumbnail-footer">
+                        <span class="page-number">Page ${i}</span>
+                        <input type="checkbox" class="page-checkbox" data-page="${i}" aria-label="Select page ${i}">
+                    </div>
+                `;
+
+                elements.thumbnailsContainer.appendChild(thumbnailItem);
+
+                // Add event listener to checkbox
+                const checkbox = thumbnailItem.querySelector('.page-checkbox');
+                checkbox.addEventListener('change', (e) => {
+                    const pageNum = parseInt(e.target.getAttribute('data-page'));
+                    if (e.target.checked) {
+                        appState.selectedPages.add(pageNum);
+                        updateThumbnailSelection(pageNum, true);
+                    } else {
+                        appState.selectedPages.delete(pageNum);
+                        updateThumbnailSelection(pageNum, false);
+                    }
+                    updateSelectionCount();
+                });
+
+                // Observe thumbnail for lazy loading
+                appState.intersectionObserver.observe(thumbnailItem);
+            }
+
+            // Update thumbnail size based on slider
+            updateThumbnailSize();
+
+            // Initialize selection count
+            updateSelectionCount();
+
+            const endTime = performance.now();
+            const duration = (endTime - startTime).toFixed(2);
+            showPerformanceInfo(`Preview ready! Thumbnails will load as you scroll. (Setup: ${duration}ms)`);
+        }
+
+        // Render single thumbnail with caching and blob URLs
+        async function renderThumbnail(pageNum, container) {
+            try {
+                // Check cache first
+                if (appState.thumbnailCache.has(pageNum)) {
+                    const cachedUrl = appState.thumbnailCache.get(pageNum);
+                    replaceThumbnailPlaceholder(container, cachedUrl, pageNum, false);
+                    return;
+                }
+
+                const page = await appState.pdfDocument.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 0.5 });
+
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+
+                await page.render(renderContext).promise;
+
+                // Convert canvas to blob instead of base64
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                const blobUrl = URL.createObjectURL(blob);
+
+                // Track blob URL for cleanup
+                appState.blobUrls.add(blobUrl);
+
+                // Cache the blob URL
+                appState.thumbnailCache.set(pageNum, blobUrl);
+
+                // Replace the placeholder with the actual thumbnail
+                replaceThumbnailPlaceholder(container, blobUrl, pageNum, false);
+
+            } catch (error) {
+                console.error(`Error rendering thumbnail for page ${pageNum}:`, error);
+                const thumbnailPlaceholder = container.querySelector('.thumbnail-placeholder');
+                if (thumbnailPlaceholder) {
+                    thumbnailPlaceholder.innerHTML = `<span style="color: #e74c3c;">Error loading</span>`;
+                }
+            }
+        }
+
+        // Helper function to replace thumbnail placeholder
+        function replaceThumbnailPlaceholder(container, imageUrl, pageNum, isBatch) {
+            const thumbnailPlaceholder = container.querySelector('.thumbnail-placeholder');
+            if (!thumbnailPlaceholder) return;
+
+            const thumbnailImage = document.createElement('img');
+            thumbnailImage.className = 'thumbnail-image';
+            thumbnailImage.src = imageUrl;
+            thumbnailImage.alt = `Page ${pageNum} thumbnail`;
+
+            container.replaceChild(thumbnailImage, thumbnailPlaceholder);
+
+            // Make the thumbnail clickable to show larger preview
+            thumbnailImage.addEventListener('click', () => {
+                showPagePreview(pageNum, isBatch);
+            });
+        }
+
+        // Update thumbnail size based on slider
+        function updateThumbnailSize() {
+            const container = elements.thumbnailsContainer;
+            
+            // Remove previous size classes
+            container.classList.remove('size-small', 'size-medium', 'size-large');
+            
+            // Apply new size class
+            switch (appState.thumbnailSize) {
+                case 1: // Small
+                    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(100px, 1fr))';
+                    break;
+                case 2: // Medium (default)
+                    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(150px, 1fr))';
+                    break;
+                case 3: // Large
+                    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(200px, 1fr))';
+                    break;
+            }
+        }
+
+        // Apply page range from input
+        function applyPageRange() {
+            const rangeInput = elements.pageRange.value.trim();
+            
+            if (!rangeInput) {
+                return;
+            }
+            
+            // Reset selection first
+            const checkboxes = document.querySelectorAll('.page-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                const pageNum = parseInt(checkbox.getAttribute('data-page'));
+                appState.selectedPages.delete(pageNum);
+                updateThumbnailSelection(pageNum, false);
+            });
+            
+            // Parse range input and apply selection
+            const ranges = rangeInput.split(',');
+            
+            ranges.forEach(range => {
+                range = range.trim();
+                
+                if (range.includes('-')) {
+                    // Range like "1-5"
+                    const [start, end] = range.split('-').map(Number);
+                    
+                    if (!isNaN(start) && !isNaN(end) && start >= 1 && end <= appState.pageCount) {
+                        for (let i = start; i <= end; i++) {
+                            selectPage(i);
+                        }
+                    }
+                } else {
+                    // Single page like "3"
+                    const pageNum = parseInt(range);
+                    
+                    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= appState.pageCount) {
+                        selectPage(pageNum);
+                    }
+                }
+            });
+
+            // Update selection count
+            updateSelectionCount();
+        }
+
+        // Select a single page
+        function selectPage(pageNum) {
+            appState.selectedPages.add(pageNum);
+
+            // Update checkbox
+            const checkbox = document.querySelector(`.page-checkbox[data-page="${pageNum}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+
+            // Update visual state
+            updateThumbnailSelection(pageNum, true);
+        }
+
+        // Show page preview in modal
+        function showPagePreview(pageNum, isBatchFile = false) {
+            // Create modal elements
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            
+            const modalContent = document.createElement('div');
+            modalContent.className = 'modal-content';
+            
+            const closeButton = document.createElement('button');
+            closeButton.innerHTML = '&times;';
+            closeButton.style.position = 'absolute';
+            closeButton.style.top = '10px';
+            closeButton.style.right = '10px';
+            closeButton.style.fontSize = '24px';
+            closeButton.style.border = 'none';
+            closeButton.style.background = 'none';
+            closeButton.style.cursor = 'pointer';
+            
+            const previewContainer = document.createElement('div');
+            previewContainer.style.textAlign = 'center';
+            
+            const pageInfo = document.createElement('h3');
+            const totalPages = isBatchFile ? 
+                appState.batchFiles[appState.currentBatchFileIndex].pageCount : 
+                appState.pageCount;
+            
+            pageInfo.textContent = `Page ${pageNum} of ${totalPages}`;
+            pageInfo.style.marginBottom = '10px';
+            
+            const previewPlaceholder = document.createElement('div');
+            previewPlaceholder.textContent = 'Loading preview...';
+            previewPlaceholder.style.padding = '100px 20px';
+            
+            // Add navigation buttons
+            const navContainer = document.createElement('div');
+            navContainer.style.display = 'flex';
+            navContainer.style.justifyContent = 'space-between';
+            navContainer.style.marginTop = '20px';
+            
+            const prevButton = document.createElement('button');
+            prevButton.textContent = 'Previous Page';
+            prevButton.disabled = pageNum <= 1;
+            
+            const nextButton = document.createElement('button');
+            nextButton.textContent = 'Next Page';
+            nextButton.disabled = pageNum >= totalPages;
+            
+            navContainer.appendChild(prevButton);
+            navContainer.appendChild(nextButton);
+            
+            // Assemble modal
+            previewContainer.appendChild(pageInfo);
+            previewContainer.appendChild(previewPlaceholder);
+            previewContainer.appendChild(navContainer);
+            
+            modalContent.appendChild(closeButton);
+            modalContent.appendChild(previewContainer);
+            
+            modal.appendChild(modalContent);
+            document.body.appendChild(modal);
+            
+            // Event listeners
+            closeButton.addEventListener('click', () => {
+                document.body.removeChild(modal);
+            });
+            
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            });
+            
+            prevButton.addEventListener('click', () => {
+                if (pageNum > 1) {
+                    document.body.removeChild(modal);
+                    showPagePreview(pageNum - 1, isBatchFile);
+                }
+            });
+            
+            nextButton.addEventListener('click', () => {
+                if (pageNum < totalPages) {
+                    document.body.removeChild(modal);
+                    showPagePreview(pageNum + 1, isBatchFile);
+                }
+            });
+            
+            // Render high-quality preview
+            if (isBatchFile) {
+                renderBatchPagePreview(pageNum, previewContainer, previewPlaceholder);
+            } else {
+                renderPagePreview(pageNum, previewContainer, previewPlaceholder);
+            }
+        }
+
+        // Render high-quality page preview
+        async function renderPagePreview(pageNum, container, placeholder) {
+            try {
+                const page = await appState.pdfDocument.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1.5 });
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                
+                await page.render(renderContext).promise;
+                
+                // Replace placeholder with rendered preview
+                const previewImage = document.createElement('img');
+                previewImage.src = canvas.toDataURL();
+                previewImage.alt = `Page ${pageNum} preview`;
+                previewImage.style.maxWidth = '100%';
+                previewImage.style.height = 'auto';
+                
+                container.replaceChild(previewImage, placeholder);
+                
+            } catch (error) {
+                console.error(`Error rendering preview for page ${pageNum}:`, error);
+                placeholder.textContent = `Error loading preview for page ${pageNum}`;
+            }
+        }
+
+        // Output Options Section
+        function setupOutputOptions() {
+            elements.splitButton.addEventListener('click', splitPdf);
+            elements.extractTextButton.addEventListener('click', extractText);
+        }
+
+        // Split PDF function
+        async function splitPdf() {
+            if (!appState.pdfDocument) {
+                showProcessingMessage('No PDF loaded.', 'error');
+                return;
+            }
+            
+            if (appState.selectedPages.size === 0) {
+                showProcessingMessage('Please select at least one page to split.', 'error');
+                return;
+            }
+            
+            try {
+                showProcessingMessage('Splitting PDF...', 'info');
+                
+                // Load PDF data using pdf-lib
+                const arrayBuffer = await readFileAsArrayBuffer(appState.currentFile);
+                const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+                
+                // Create a new document
+                const newPdfDoc = await PDFLib.PDFDocument.create();
+                
+                // Sort selected pages for consistency
+                const selectedPages = Array.from(appState.selectedPages).sort((a, b) => a - b);
+                
+                // Copy selected pages to new document
+                for (const pageNum of selectedPages) {
+                    // Page numbers in pdf-lib are 0-based
+                    const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
+                    newPdfDoc.addPage(copiedPage);
+                }
+                
+                // Save new document as bytes
+                const pdfBytes = await newPdfDoc.save();
+                
+                // Create download link
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                
+                // Get filename
+                let outputFilename = elements.outputFilename.value.trim();
+                if (!outputFilename) {
+                    const originalName = appState.currentFile.name.replace('.pdf', '');
+                    const pageRange = selectedPages.length > 1 
+                        ? `${selectedPages[0]}-${selectedPages[selectedPages.length - 1]}` 
+                        : selectedPages[0];
+                    outputFilename = `${originalName}_pages_${pageRange}.pdf`;
+                } else if (!outputFilename.toLowerCase().endsWith('.pdf')) {
+                    outputFilename += '.pdf';
+                }
+                
+                // Create download link
+                createDownloadLink(blob, outputFilename, 'PDF');
+                
+                showProcessingMessage('PDF split successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error splitting PDF:', error);
+                showProcessingMessage('Error splitting PDF: ' + error.message, 'error');
+            }
+        }
+
+        // Extract text from PDF function
+        async function extractText() {
+            if (!appState.pdfDocument) {
+                showProcessingMessage('No PDF loaded.', 'error');
+                return;
+            }
+            
+            if (appState.selectedPages.size === 0) {
+                showProcessingMessage('Please select at least one page to extract text from.', 'error');
+                return;
+            }
+            
+            try {
+                showProcessingMessage('Extracting text...', 'info');
+                
+                // Sort selected pages for consistency
+                const selectedPages = Array.from(appState.selectedPages).sort((a, b) => a - b);
+                
+                let extractedText = '';
+                
+                // Extract text from each selected page
+                for (const pageNum of selectedPages) {
+                    const page = await appState.pdfDocument.getPage(pageNum);
+                    const textContent = await page.getTextContent();
+                    
+                    extractedText += `--- Page ${pageNum} ---\n\n`;
+                    
+                    // Process text items
+                    const items = textContent.items;
+                    let lastY;
+                    
+                    for (const item of items) {
+                        if (lastY !== item.transform[5] && lastY !== undefined) {
+                            extractedText += '\n';  // Add newline for new vertical position
+                        }
+                        
+                        extractedText += item.str + ' ';
+                        lastY = item.transform[5];
+                    }
+                    
+                    extractedText += '\n\n';
+                }
+                
+                // Create download link
+                const blob = new Blob([extractedText], { type: 'text/plain' });
+                
+                // Get filename
+                let outputFilename = elements.outputFilename.value.trim();
+                if (!outputFilename) {
+                    const originalName = appState.currentFile.name.replace('.pdf', '');
+                    const pageRange = selectedPages.length > 1 
+                        ? `${selectedPages[0]}-${selectedPages[selectedPages.length - 1]}` 
+                        : selectedPages[0];
+                    outputFilename = `${originalName}_pages_${pageRange}.txt`;
+                } else if (!outputFilename.toLowerCase().endsWith('.txt')) {
+                    outputFilename += '.txt';
+                }
+                
+                // Create download link
+                createDownloadLink(blob, outputFilename, 'Text');
+                
+                showProcessingMessage('Text extracted successfully!', 'success');
+                
+            } catch (error) {
+                console.error('Error extracting text:', error);
+                showProcessingMessage('Error extracting text: ' + error.message, 'error');
+            }
+        }
+
+        // Show processing message
+        function showProcessingMessage(message, type = 'info') {
+            elements.processingStatus.textContent = message;
+            elements.processingStatus.className = `processing-status ${type}`;
+        }
+
+        // Create download link
+        function createDownloadLink(blob, filename, type) {
+            const url = URL.createObjectURL(blob);
+
+            const downloadItem = document.createElement('div');
+            downloadItem.className = 'download-link';
+
+            const filenameSpan = document.createElement('span');
+            filenameSpan.textContent = filename;
+
+            const downloadLink = document.createElement('a');
+            downloadLink.href = url;
+            downloadLink.download = filename;
+            downloadLink.className = 'download-button';
+            downloadLink.textContent = `Download ${type}`;
+
+            downloadItem.appendChild(filenameSpan);
+            downloadItem.appendChild(downloadLink);
+
+            // Clear previous download links
+            elements.downloadContainer.innerHTML = '<h3>Download Files</h3>';
+            elements.downloadContainer.appendChild(downloadItem);
+
+            // Auto download
+            setTimeout(() => {
+                downloadLink.click();
+
+                // Revoke URL after download starts (with delay to ensure download initiated)
+                setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                }, 5000);
+            }, 1000);
+        }
+
+        // Batch Processing Section
+        function setupBatchProcessing() {
+            // File input change
+            elements.batchFileInput.addEventListener('change', handleBatchFileSelection);
+            
+            // Drag and drop functionality
+            elements.batchDropArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                elements.batchDropArea.classList.add('highlight');
+            });
+            
+            elements.batchDropArea.addEventListener('dragleave', () => {
+                elements.batchDropArea.classList.remove('highlight');
+            });
+            
+            elements.batchDropArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                elements.batchDropArea.classList.remove('highlight');
+                
+                if (e.dataTransfer.files.length) {
+                    handleBatchFileSelection({ target: { files: e.dataTransfer.files } });
+                }
+            });
+            
+            // Batch action buttons
+            elements.batchSplit.addEventListener('click', () => processBatch('split'));
+            elements.batchExtractText.addEventListener('click', () => processBatch('text'));
+        }
+
+        // Handle batch file selection
+        async function handleBatchFileSelection(event) {
+            const files = Array.from(event.target.files);
+            const pdfFiles = files.filter(file => file.type === 'application/pdf');
+            
+            if (pdfFiles.length === 0) {
+                showBatchStatus('No PDF files selected.', 'error');
+                return;
+            }
+            
+            showBatchStatus(`Loading ${pdfFiles.length} PDF files...`, 'info');
+            
+            // Process each file to extract page count
+            for (let i = 0; i < pdfFiles.length; i++) {
+                const file = pdfFiles[i];
+                try {
+                    // Load PDF to get page count
+                    const arrayBuffer = await readFileAsArrayBuffer(file);
+                    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+                    const pdfDocument = await loadingTask.promise;
+                    
+                    // Add file with metadata to state
+                    const batchFile = {
+                        file: file,
+                        name: file.name,
+                        size: file.size,
+                        pageCount: pdfDocument.numPages,
+                        pdfDocument: pdfDocument
+                    };
+                    
+                    appState.batchFiles.push(batchFile);
+                    
+                    // Initialize selected pages for this file
+                    appState.batchSelectedPages[appState.batchFiles.length - 1] = new Set();
+                    
+                    showBatchStatus(`Loaded ${i+1}/${pdfFiles.length} files...`, 'info');
+                } catch (error) {
+                    console.error(`Error loading PDF file ${file.name}:`, error);
+                    showBatchStatus(`Error loading ${file.name}: ${error.message}`, 'error');
+                }
+            }
+            
+            // Update UI
+            updateBatchFilesList();
+            showBatchStatus(`${pdfFiles.length} PDF files added to batch.`, 'success');
+        }
+
+        // Update batch files list in UI
+        function updateBatchFilesList() {
+            elements.batchFilesList.innerHTML = '';
+            
+            appState.batchFiles.forEach((batchFile, index) => {
+                const fileItem = document.createElement('div');
+                fileItem.className = 'batch-file-item';
+                
+                // Count selected pages for this file
+                const selectedCount = appState.batchSelectedPages[index] ? 
+                    appState.batchSelectedPages[index].size : 0;
+                
+                const pagesInfo = selectedCount > 0 ? 
+                    `${selectedCount}/${batchFile.pageCount} pages selected` : 
+                    `${batchFile.pageCount} pages`;
+                
+                fileItem.innerHTML = `
+                    <div class="batch-file-info">
+                        <div>${batchFile.name} (${formatFileSize(batchFile.size)})</div>
+                        <div style="font-size: 0.85em; opacity: 0.7;">${pagesInfo}</div>
+                    </div>
+                    <div class="batch-file-actions">
+                        <button class="view-pages-button" data-index="${index}">View Pages</button>
+                        <button class="remove-batch-file" data-index="${index}">Remove</button>
+                    </div>
+                `;
+                
+                elements.batchFilesList.appendChild(fileItem);
+            });
+            
+            // Add event listeners to buttons
+            document.querySelectorAll('.view-pages-button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const index = parseInt(button.getAttribute('data-index'));
+                    showBatchFilePreview(index);
+                });
+            });
+            
+            document.querySelectorAll('.remove-batch-file').forEach(button => {
+                button.addEventListener('click', () => {
+                    const index = parseInt(button.getAttribute('data-index'));
+                    appState.batchFiles.splice(index, 1);
+                    
+                    // Update selected pages object
+                    const newSelectedPages = {};
+                    Object.keys(appState.batchSelectedPages).forEach(key => {
+                        const keyInt = parseInt(key);
+                        if (keyInt < index) {
+                            newSelectedPages[keyInt] = appState.batchSelectedPages[keyInt];
+                        } else if (keyInt > index) {
+                            newSelectedPages[keyInt - 1] = appState.batchSelectedPages[keyInt];
+                        }
+                    });
+                    appState.batchSelectedPages = newSelectedPages;
+                    
+                    updateBatchFilesList();
+                    
+                    // Hide preview if it was showing this file
+                    if (appState.currentBatchFileIndex === index) {
+                        elements.batchPreviewContainer.style.display = 'none';
+                        appState.currentBatchFileIndex = null;
+                    }
+                });
+            });
+        }
+
+        // Show batch file preview
+        function showBatchFilePreview(index) {
+            const batchFile = appState.batchFiles[index];
+            
+            // Update current batch file index
+            appState.currentBatchFileIndex = index;
+            
+            // Update preview container title
+            elements.batchPreviewTitle.textContent = `Preview: ${batchFile.name}`;
+            
+            // Show preview container
+            elements.batchPreviewContainer.style.display = 'block';
+            
+            // Generate thumbnails for this batch file
+            generateBatchThumbnails(index);
+        }
+
+        // Generate thumbnails for batch file with lazy loading
+        async function generateBatchThumbnails(fileIndex) {
+            const batchFile = appState.batchFiles[fileIndex];
+            const pdfDocument = batchFile.pdfDocument;
+
+            // Clear previous thumbnails
+            elements.batchThumbnailsContainer.innerHTML = '';
+
+            const startTime = performance.now();
+
+            // Generate placeholder thumbnails for each page
+            for (let i = 1; i <= batchFile.pageCount; i++) {
+                const thumbnailItem = document.createElement('div');
+                thumbnailItem.className = 'thumbnail-item';
+                thumbnailItem.setAttribute('data-page', i);
+                thumbnailItem.innerHTML = `
+                    <div class="thumbnail-placeholder loading" style="height: 200px; display: flex; align-items: center; justify-content: center;">
+                        <span style="color: #999;">Page ${i}</span>
+                    </div>
+                    <div class="thumbnail-footer">
+                        <span class="page-number">Page ${i}</span>
+                        <input type="checkbox" class="batch-page-checkbox" data-page="${i}" aria-label="Select page ${i}">
+                    </div>
+                `;
+
+                elements.batchThumbnailsContainer.appendChild(thumbnailItem);
+
+                // Add event listener to checkbox
+                const checkbox = thumbnailItem.querySelector('.batch-page-checkbox');
+
+                // Set initial checkbox state based on selection
+                if (appState.batchSelectedPages[fileIndex] &&
+                    appState.batchSelectedPages[fileIndex].has(i)) {
+                    checkbox.checked = true;
+                    thumbnailItem.classList.add('selected');
+                }
+
+                checkbox.addEventListener('change', (e) => {
+                    const pageNum = parseInt(e.target.getAttribute('data-page'));
+                    if (!appState.batchSelectedPages[fileIndex]) {
+                        appState.batchSelectedPages[fileIndex] = new Set();
+                    }
+
+                    if (e.target.checked) {
+                        appState.batchSelectedPages[fileIndex].add(pageNum);
+                        updateBatchThumbnailSelection(pageNum, true);
+                    } else {
+                        appState.batchSelectedPages[fileIndex].delete(pageNum);
+                        updateBatchThumbnailSelection(pageNum, false);
+                    }
+
+                    // Update batch files list to show selected count
+                    updateBatchFilesList();
+
+                    // Update batch selection count
+                    updateBatchSelectionCount();
+                });
+
+                // Observe thumbnail for lazy loading
+                appState.batchIntersectionObserver.observe(thumbnailItem);
+            }
+
+            // Initialize batch selection count
+            updateBatchSelectionCount();
+
+            const endTime = performance.now();
+            const duration = (endTime - startTime).toFixed(2);
+            showPerformanceInfo(`Batch preview ready! (Setup: ${duration}ms)`);
+        }
+
+        // Render single batch file thumbnail with caching and blob URLs
+        async function renderBatchThumbnail(fileIndex, pageNum, container) {
+            try {
+                const cacheKey = `${fileIndex}-${pageNum}`;
+
+                // Check cache first
+                if (appState.batchThumbnailCache.has(cacheKey)) {
+                    const cachedUrl = appState.batchThumbnailCache.get(cacheKey);
+                    replaceThumbnailPlaceholder(container, cachedUrl, pageNum, true);
+                    return;
+                }
+
+                const pdfDocument = appState.batchFiles[fileIndex].pdfDocument;
+                const page = await pdfDocument.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 0.5 });
+
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+
+                await page.render(renderContext).promise;
+
+                // Convert canvas to blob instead of base64
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+                const blobUrl = URL.createObjectURL(blob);
+
+                // Track blob URL for cleanup
+                appState.blobUrls.add(blobUrl);
+
+                // Cache the blob URL
+                appState.batchThumbnailCache.set(cacheKey, blobUrl);
+
+                // Replace the placeholder with the actual thumbnail
+                replaceThumbnailPlaceholder(container, blobUrl, pageNum, true);
+
+            } catch (error) {
+                console.error(`Error rendering thumbnail for page ${pageNum}:`, error);
+                const thumbnailPlaceholder = container.querySelector('.thumbnail-placeholder');
+                if (thumbnailPlaceholder) {
+                    thumbnailPlaceholder.innerHTML = `<span style="color: #e74c3c;">Error loading</span>`;
+                }
+            }
+        }
+
+        // Render batch page preview
+        async function renderBatchPagePreview(pageNum, container, placeholder) {
+            try {
+                const fileIndex = appState.currentBatchFileIndex;
+                const pdfDocument = appState.batchFiles[fileIndex].pdfDocument;
+                
+                const page = await pdfDocument.getPage(pageNum);
+                const viewport = page.getViewport({ scale: 1.5 });
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+                
+                const renderContext = {
+                    canvasContext: context,
+                    viewport: viewport
+                };
+                
+                await page.render(renderContext).promise;
+                
+                // Replace placeholder with rendered preview
+                const previewImage = document.createElement('img');
+                previewImage.src = canvas.toDataURL();
+                previewImage.alt = `Page ${pageNum} preview`;
+                previewImage.style.maxWidth = '100%';
+                previewImage.style.height = 'auto';
+                
+                container.replaceChild(previewImage, placeholder);
+                
+            } catch (error) {
+                console.error(`Error rendering preview for page ${pageNum}:`, error);
+                placeholder.textContent = `Error loading preview for page ${pageNum}`;
+            }
+        }
+
+        // Batch select all pages
+        function batchSelectAll() {
+            if (appState.currentBatchFileIndex === null) return;
+            
+            const fileIndex = appState.currentBatchFileIndex;
+            const batchFile = appState.batchFiles[fileIndex];
+            
+            // Initialize selected pages for this file if not already done
+            if (!appState.batchSelectedPages[fileIndex]) {
+                appState.batchSelectedPages[fileIndex] = new Set();
+            }
+            
+            // Select all pages
+            const checkboxes = document.querySelectorAll('.batch-page-checkbox');
+            for (let i = 1; i <= batchFile.pageCount; i++) {
+                appState.batchSelectedPages[fileIndex].add(i);
+            }
+
+            // Update checkboxes and visual state
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+                const pageNum = parseInt(checkbox.getAttribute('data-page'));
+                updateBatchThumbnailSelection(pageNum, true);
+            });
+
+            // Update batch files list
+            updateBatchFilesList();
+
+            // Update batch selection count
+            updateBatchSelectionCount();
+        }
+
+        // Batch deselect all pages
+        function batchDeselectAll() {
+            if (appState.currentBatchFileIndex === null) return;
+            
+            const fileIndex = appState.currentBatchFileIndex;
+            
+            // Clear selected pages for this file
+            appState.batchSelectedPages[fileIndex] = new Set();
+
+            // Update checkboxes and visual state
+            const checkboxes = document.querySelectorAll('.batch-page-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                const pageNum = parseInt(checkbox.getAttribute('data-page'));
+                updateBatchThumbnailSelection(pageNum, false);
+            });
+
+            // Update batch files list
+            updateBatchFilesList();
+
+            // Update batch selection count
+            updateBatchSelectionCount();
+        }
+
+        // Apply batch page range
+        function applyBatchPageRange() {
+            if (appState.currentBatchFileIndex === null) return;
+            
+            const fileIndex = appState.currentBatchFileIndex;
+            const batchFile = appState.batchFiles[fileIndex];
+            const rangeInput = elements.batchPageRange.value.trim();
+            
+            if (!rangeInput) {
+                return;
+            }
+            
+            // Initialize selected pages for this file if not already done
+            if (!appState.batchSelectedPages[fileIndex]) {
+                appState.batchSelectedPages[fileIndex] = new Set();
+            } else {
+                // Clear existing selection
+                appState.batchSelectedPages[fileIndex].clear();
+            }
+            
+            // Reset checkboxes and visual state
+            const checkboxes = document.querySelectorAll('.batch-page-checkbox');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                const pageNum = parseInt(checkbox.getAttribute('data-page'));
+                updateBatchThumbnailSelection(pageNum, false);
+            });
+            
+            // Parse range input and apply selection
+            const ranges = rangeInput.split(',');
+            
+            ranges.forEach(range => {
+                range = range.trim();
+                
+                if (range.includes('-')) {
+                    // Range like "1-5"
+                    const [start, end] = range.split('-').map(Number);
+                    
+                    if (!isNaN(start) && !isNaN(end) && start >= 1 && end <= batchFile.pageCount) {
+                        for (let i = start; i <= end; i++) {
+                            selectBatchPage(fileIndex, i);
+                        }
+                    }
+                } else {
+                    // Single page like "3"
+                    const pageNum = parseInt(range);
+                    
+                    if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= batchFile.pageCount) {
+                        selectBatchPage(fileIndex, pageNum);
+                    }
+                }
+            });
+            
+            // Update batch files list
+            updateBatchFilesList();
+
+            // Update batch selection count
+            updateBatchSelectionCount();
+        }
+
+        // Select a single batch page
+        function selectBatchPage(fileIndex, pageNum) {
+            // Add page to selected pages
+            appState.batchSelectedPages[fileIndex].add(pageNum);
+
+            // Update checkbox
+            const checkbox = document.querySelector(`.batch-page-checkbox[data-page="${pageNum}"]`);
+            if (checkbox) {
+                checkbox.checked = true;
+            }
+
+            // Update visual state
+            updateBatchThumbnailSelection(pageNum, true);
+        }
+
+        // Process batch of files
+        async function processBatch(mode) {
+            // Check if any files are in batch
+            if (appState.batchFiles.length === 0) {
+                showBatchStatus('No files in batch.', 'error');
+                return;
+            }
+            
+            // Check if any pages are selected
+            let hasSelectedPages = false;
+            for (const fileIndex in appState.batchSelectedPages) {
+                if (appState.batchSelectedPages[fileIndex].size > 0) {
+                    hasSelectedPages = true;
+                    break;
+                }
+            }
+            
+            if (!hasSelectedPages) {
+                showBatchStatus('No pages selected. Please select pages from at least one file.', 'error');
+                return;
+            }
+            
+            // Clear previous results
+            elements.batchResults.innerHTML = '<h3>Batch Results</h3>';
+            
+            // Process each file that has selected pages
+            for (let i = 0; i < appState.batchFiles.length; i++) {
+                if (!appState.batchSelectedPages[i] || appState.batchSelectedPages[i].size === 0) {
+                    continue; // Skip files with no selected pages
+                }
+                
+                const file = appState.batchFiles[i].file;
+                showBatchStatus(`Processing ${file.name}...`, 'info');
+                
+                try {
+                    // Process file based on mode
+                    if (mode === 'split') {
+                        await processBatchSplit(i);
+                    } else {
+                        await processBatchText(i);
+                    }
+                    
+                    // Add success result
+                    addBatchResult(file.name, true, mode);
+                    
+                } catch (error) {
+                    console.error(`Error processing ${file.name}:`, error);
+                    addBatchResult(file.name, false, mode, error.message);
+                }
+            }
+            
+            showBatchStatus(`Batch processing complete.`, 'success');
+        }
+
+        // Process batch split with selected pages
+        async function processBatchSplit(fileIndex) {
+            const batchFile = appState.batchFiles[fileIndex];
+            const selectedPages = Array.from(appState.batchSelectedPages[fileIndex]).sort((a, b) => a - b);
+            
+            // Re-read the file to avoid ArrayBuffer detachment issues
+            const arrayBuffer = await readFileAsArrayBuffer(batchFile.file);
+            
+            // Load PDF with pdf-lib using the fresh ArrayBuffer
+            const pdfDoc = await PDFLib.PDFDocument.load(arrayBuffer);
+            
+            // Create a new document
+            const newPdfDoc = await PDFLib.PDFDocument.create();
+            
+            // Copy selected pages to new document
+            for (const pageNum of selectedPages) {
+                // Page numbers in pdf-lib are 0-based
+                const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [pageNum - 1]);
+                newPdfDoc.addPage(copiedPage);
+            }
+            
+            // Save new document as bytes
+            const pdfBytes = await newPdfDoc.save();
+            
+            // Create download link
+            const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+            const fileName = batchFile.name.replace('.pdf', '');
+            const pageRange = selectedPages.length > 1 
+                ? `${selectedPages[0]}-${selectedPages[selectedPages.length - 1]}` 
+                : selectedPages[0];
+                
+            const outputFilename = `${fileName}_pages_${pageRange}.pdf`;
+            
+            // Create download link
+            createBatchDownloadLink(blob, outputFilename, 'PDF', fileIndex);
+        }
+
+        // Process batch text extraction with selected pages
+        async function processBatchText(fileIndex) {
+            const batchFile = appState.batchFiles[fileIndex];
+            const selectedPages = Array.from(appState.batchSelectedPages[fileIndex]).sort((a, b) => a - b);
+            const pdfDocument = batchFile.pdfDocument;
+            
+            let extractedText = '';
+            
+            // Extract text from each selected page
+            for (const pageNum of selectedPages) {
+                const page = await pdfDocument.getPage(pageNum);
+                const textContent = await page.getTextContent();
+                
+                extractedText += `--- Page ${pageNum} ---\n\n`;
+                
+                // Process text items
+                const items = textContent.items;
+                let lastY;
+                
+                for (const item of items) {
+                    if (lastY !== item.transform[5] && lastY !== undefined) {
+                        extractedText += '\n';  // Add newline for new vertical position
+                    }
+                    
+                    extractedText += item.str + ' ';
+                    lastY = item.transform[5];
+                }
+                
+                extractedText += '\n\n';
+            }
+            
+            // Create download link
+            const blob = new Blob([extractedText], { type: 'text/plain' });
+            const fileName = batchFile.name.replace('.pdf', '');
+            const pageRange = selectedPages.length > 1 
+                ? `${selectedPages[0]}-${selectedPages[selectedPages.length - 1]}` 
+                : selectedPages[0];
+                
+            const outputFilename = `${fileName}_pages_${pageRange}.txt`;
+            
+            // Create download link
+            createBatchDownloadLink(blob, outputFilename, 'Text', fileIndex);
+        }
+
+        // Create batch download link
+        function createBatchDownloadLink(blob, filename, type, index) {
+            const url = URL.createObjectURL(blob);
+
+            const downloadItem = document.createElement('div');
+            downloadItem.className = 'download-link';
+            downloadItem.innerHTML = `
+                <span>${filename}</span>
+                <a href="${url}" download="${filename}" class="download-button">Download ${type}</a>
+            `;
+
+            elements.batchResults.appendChild(downloadItem);
+
+            // Auto download
+            setTimeout(() => {
+                downloadItem.querySelector('a').click();
+
+                // Revoke URL after download starts (with delay to ensure download initiated)
+                setTimeout(() => {
+                    URL.revokeObjectURL(url);
+                }, 5000);
+            }, 1000);
+        }
+
+        // Add batch result
+        function addBatchResult(filename, success, mode, errorMessage = '') {
+            const resultItem = document.createElement('div');
+            resultItem.className = `batch-result-item ${success ? 'success' : 'error'}`;
+            
+            resultItem.innerHTML = `
+                <div>
+                    <strong>${filename}</strong>
+                    <div class="result-details">${mode === 'split' ? 'PDF Split' : 'Text Extraction'} - ${success ? 'Success' : 'Failed'}</div>
+                    ${errorMessage ? `<div class="error-message">${errorMessage}</div>` : ''}
+                </div>
+                <span class="result-status ${success ? 'success' : 'error'}">${success ? '✓' : '✗'}</span>
+            `;
+            
+            elements.batchResults.appendChild(resultItem);
+        }
+
+        // Show batch status
+        function showBatchStatus(message, type = 'info') {
+            elements.batchStatus.textContent = message;
+            elements.batchStatus.className = `batch-status ${type}`;
+        }
+
+        // Format file size
+        function formatFileSize(bytes) {
+            if (bytes < 1024) {
+                return bytes + ' B';
+            } else if (bytes < 1024 * 1024) {
+                return (bytes / 1024).toFixed(1) + ' KB';
+            } else {
+                return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+            }
+        }
+
+        // Accessibility controls
+        function setupAccessibilityControls() {
+            // High contrast toggle
+            elements.highContrastToggle.addEventListener('click', () => {
+                document.body.classList.toggle('high-contrast');
+                saveAccessibilityPreferences();
+            });
+            
+            // Large text toggle
+            elements.largeTextToggle.addEventListener('click', () => {
+                document.body.classList.toggle('large-text');
+                saveAccessibilityPreferences();
+            });
+        }
+
+        // Save accessibility preferences to localStorage
+        function saveAccessibilityPreferences() {
+            const preferences = {
+                highContrast: document.body.classList.contains('high-contrast'),
+                largeText: document.body.classList.contains('large-text')
+            };
+            
+            localStorage.setItem('pdfSplitterAccessibility', JSON.stringify(preferences));
+        }
+
+        // Load accessibility preferences from localStorage
+        function loadAccessibilityPreferences() {
+            try {
+                const preferences = JSON.parse(localStorage.getItem('pdfSplitterAccessibility')) || {};
+                
+                if (preferences.highContrast) {
+                    document.body.classList.add('high-contrast');
+                }
+                
+                if (preferences.largeText) {
+                    document.body.classList.add('large-text');
+                }
+            } catch (error) {
+                console.error('Error loading accessibility preferences:', error);
+            }
+        }
+
+        // Initialize the application when the DOM is loaded
+        document.addEventListener('DOMContentLoaded', initApp);
+    </script>
+</body>
+</html>
