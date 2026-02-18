@@ -1916,7 +1916,7 @@
                 
                 fileItem.innerHTML = `
                     <div class="batch-file-info">
-                        <div>${batchFile.name} (${formatFileSize(batchFile.size)})</div>
+                        <div>${escapeHtml(batchFile.name)} (${formatFileSize(batchFile.size)})</div>
                         <div style="font-size: 0.85em; opacity: 0.7;">${pagesInfo}</div>
                     </div>
                     <div class="batch-file-actions">
@@ -2410,8 +2410,8 @@
             const downloadItem = document.createElement('div');
             downloadItem.className = 'download-link';
             downloadItem.innerHTML = `
-                <span>${filename}</span>
-                <a href="${url}" download="${filename}" class="download-button">Download ${type}</a>
+                <span>${escapeHtml(filename)}</span>
+                <a href="${url}" download="${escapeHtml(filename)}" class="download-button">Download ${escapeHtml(type)}</a>
             `;
 
             elements.batchResults.appendChild(downloadItem);
@@ -2434,9 +2434,9 @@
             
             resultItem.innerHTML = `
                 <div>
-                    <strong>${filename}</strong>
+                    <strong>${escapeHtml(filename)}</strong>
                     <div class="result-details">${mode === 'split' ? 'PDF Split' : 'Text Extraction'} - ${success ? 'Success' : 'Failed'}</div>
-                    ${errorMessage ? `<div class="error-message">${errorMessage}</div>` : ''}
+                    ${errorMessage ? `<div class="error-message">${escapeHtml(errorMessage)}</div>` : ''}
                 </div>
                 <span class="result-status ${success ? 'success' : 'error'}">${success ? '✓' : '✗'}</span>
             `;
@@ -2448,6 +2448,13 @@
         function showBatchStatus(message, type = 'info') {
             elements.batchStatus.textContent = message;
             elements.batchStatus.className = `batch-status ${type}`;
+        }
+
+        // Escape HTML special characters to prevent XSS
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(str));
+            return div.innerHTML;
         }
 
         // Format file size
