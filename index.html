@@ -1066,6 +1066,13 @@
                     <h3>Conversion Options</h3>
                     <div class="epub-options-grid">
                         <div class="epub-option-group">
+                            <label for="epub-render-mode">Render Mode</label>
+                            <select id="epub-render-mode">
+                                <option value="text" selected>Text-based (smaller file)</option>
+                                <option value="image">Image-based (preserves layout)</option>
+                            </select>
+                        </div>
+                        <div class="epub-option-group">
                             <label for="epub-page-size">Page Size</label>
                             <select id="epub-page-size">
                                 <option value="a4" selected>A4</option>
@@ -1090,7 +1097,19 @@
                                 <option value="2.0">Double (2.0)</option>
                             </select>
                         </div>
+                        <div class="epub-option-group" id="epub-quality-group">
+                            <label for="epub-quality">Image Quality</label>
+                            <select id="epub-quality">
+                                <option value="0.5">Low (smallest file)</option>
+                                <option value="0.65" selected>Medium</option>
+                                <option value="0.8">High</option>
+                                <option value="0.92">Maximum (largest file)</option>
+                            </select>
+                        </div>
                     </div>
+                    <p id="epub-mode-hint" style="font-size: var(--font-size-small); opacity: 0.7; margin-top: 0.5rem;">
+                        Text-based mode produces much smaller PDFs by writing text directly. Image-based mode captures the full visual layout.
+                    </p>
 
                     <div class="action-buttons">
                         <button id="epub-convert-button" class="primary-button">Convert to PDF</button>
@@ -2796,7 +2815,11 @@
             pageSize: null,
             fontSize: null,
             margin: null,
-            lineHeight: null
+            lineHeight: null,
+            renderMode: null,
+            quality: null,
+            qualityGroup: null,
+            modeHint: null
         };
 
         function initEpubElements() {
@@ -2820,6 +2843,10 @@
             epubElements.fontSize = document.getElementById('epub-font-size');
             epubElements.margin = document.getElementById('epub-margin');
             epubElements.lineHeight = document.getElementById('epub-line-height');
+            epubElements.renderMode = document.getElementById('epub-render-mode');
+            epubElements.quality = document.getElementById('epub-quality');
+            epubElements.qualityGroup = document.getElementById('epub-quality-group');
+            epubElements.modeHint = document.getElementById('epub-mode-hint');
         }
 
         function setupEpubConverter() {
@@ -2845,6 +2872,17 @@
             });
 
             epubElements.convertButton.addEventListener('click', convertEpubToPdf);
+
+            // Toggle quality options visibility based on render mode
+            epubElements.renderMode.addEventListener('change', () => {
+                const isImage = epubElements.renderMode.value === 'image';
+                epubElements.qualityGroup.style.display = isImage ? '' : 'none';
+                epubElements.modeHint.textContent = isImage
+                    ? 'Image-based mode captures the full visual layout but produces larger files.'
+                    : 'Text-based mode produces much smaller PDFs by writing text directly. Image-based mode captures the full visual layout.';
+            });
+            // Set initial visibility
+            epubElements.qualityGroup.style.display = 'none';
         }
 
         async function handleEpubFileSelection(event) {
@@ -3172,10 +3210,12 @@
             epubElements.convertButton.disabled = true;
             epubElements.downloadContainer.style.display = 'none';
 
+            const renderMode = epubElements.renderMode.value;
             const pageSizeKey = epubElements.pageSize.value;
             const fontSize = parseInt(epubElements.fontSize.value) || 12;
             const margin = parseInt(epubElements.margin.value) || 20;
             const lineHeight = parseFloat(epubElements.lineHeight.value) || 1.6;
+            const quality = parseFloat(epubElements.quality.value) || 0.65;
 
             // Page dimensions in mm
             const pageSizes = {
@@ -3184,10 +3224,6 @@
                 legal: { width: 215.9, height: 355.6 }
             };
             const pageSize = pageSizes[pageSizeKey] || pageSizes.a4;
-
-            // Content width in pixels for rendering (at 96 DPI, 1mm ~ 3.78px)
-            const contentWidthMm = pageSize.width - (margin * 2);
-            const contentWidthPx = Math.round(contentWidthMm * 3.78);
 
             try {
                 updateEpubProgress(0, 'Loading chapters...');
@@ -3211,13 +3247,6 @@
 
                 updateEpubProgress(20, 'Preparing content for rendering...');
 
-                // Set up the render container
-                const renderContainer = epubElements.renderContainer;
-                renderContainer.style.width = contentWidthPx + 'px';
-                renderContainer.style.fontSize = fontSize + 'pt';
-                renderContainer.style.lineHeight = String(lineHeight);
-                renderContainer.style.padding = '20px';
-
                 // Create the jsPDF document
                 const { jsPDF } = window.jspdf;
                 const pdf = new jsPDF({
@@ -3233,96 +3262,13 @@
                     subject: epubState.metadata.description || ''
                 });
 
-                let isFirstPage = true;
-
-                // Process each chapter
-                for (let i = 0; i < chapters.length; i++) {
-                    updateEpubProgress(
-                        20 + (i / chapters.length * 70),
-                        `Rendering chapter ${i + 1} of ${chapters.length}...`
-                    );
-
-                    // Render chapter content in the hidden container
-                    renderContainer.innerHTML = chapters[i];
-
-                    // Wait for images to load
-                    const imgs = renderContainer.querySelectorAll('img');
-                    if (imgs.length > 0) {
-                        await Promise.all(Array.from(imgs).map(img => {
-                            if (img.complete) return Promise.resolve();
-                            return new Promise(resolve => {
-                                img.onload = resolve;
-                                img.onerror = resolve;
-                            });
-                        }));
-                    }
-
-                    // Allow layout to settle
-                    await new Promise(resolve => setTimeout(resolve, 100));
-
-                    // Use html2canvas to capture the rendered content
-                    const canvas = await html2canvas(renderContainer, {
-                        scale: 2,
-                        useCORS: true,
-                        allowTaint: true,
-                        backgroundColor: '#ffffff',
-                        logging: false
-                    });
-
-                    // Calculate how many PDF pages this chapter needs
-                    const canvasWidthMm = contentWidthMm;
-                    const scaleFactor = canvasWidthMm / canvas.width;
-                    const canvasHeightMm = canvas.height * scaleFactor;
-                    const contentHeightMm = pageSize.height - (margin * 2);
-
-                    // Split the canvas into pages
-                    const totalPages = Math.ceil(canvasHeightMm / contentHeightMm);
-
-                    for (let p = 0; p < totalPages; p++) {
-                        if (!isFirstPage) {
-                            pdf.addPage([pageSize.width, pageSize.height]);
-                        }
-                        isFirstPage = false;
-
-                        // Calculate the slice of the canvas for this page
-                        const sliceHeightPx = contentHeightMm / scaleFactor;
-                        const sourceY = p * sliceHeightPx;
-                        const sourceHeight = Math.min(sliceHeightPx, canvas.height - sourceY);
-
-                        if (sourceHeight <= 0) break;
-
-                        // Create a temporary canvas for the slice
-                        const sliceCanvas = document.createElement('canvas');
-                        sliceCanvas.width = canvas.width;
-                        sliceCanvas.height = Math.ceil(sourceHeight);
-
-                        const sliceCtx = sliceCanvas.getContext('2d');
-                        sliceCtx.fillStyle = '#ffffff';
-                        sliceCtx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-                        sliceCtx.drawImage(
-                            canvas,
-                            0, sourceY, canvas.width, sourceHeight,
-                            0, 0, canvas.width, sourceHeight
-                        );
-
-                        const imgData = sliceCanvas.toDataURL('image/jpeg', 0.92);
-                        const imgHeightMm = sourceHeight * scaleFactor;
-
-                        pdf.addImage(
-                            imgData,
-                            'JPEG',
-                            margin,
-                            margin,
-                            canvasWidthMm,
-                            imgHeightMm
-                        );
-                    }
+                if (renderMode === 'text') {
+                    await convertEpubTextMode(pdf, chapters, pageSize, margin, fontSize, lineHeight);
+                } else {
+                    await convertEpubImageMode(pdf, chapters, pageSize, margin, fontSize, lineHeight, quality);
                 }
 
                 updateEpubProgress(95, 'Generating PDF file...');
-
-                // Clean up render container
-                renderContainer.innerHTML = '';
 
                 // Generate filename
                 const title = epubState.metadata.title || 'converted';
@@ -3368,6 +3314,327 @@
                 epubState.isConverting = false;
                 epubElements.convertButton.disabled = false;
             }
+        }
+
+        // ---- Text-based rendering (small file size) ----
+        // Extracts text and images from HTML, writes them directly to the PDF
+        // using jsPDF's native text/image methods. Produces vector text, not raster.
+
+        function extractContentBlocks(html) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(`<div>${html}</div>`, 'text/html');
+            const blocks = [];
+
+            function walkNodes(node) {
+                for (const child of node.childNodes) {
+                    if (child.nodeType === Node.TEXT_NODE) {
+                        const text = child.textContent.trim();
+                        if (text) {
+                            blocks.push({ type: 'text', text, tag: 'p' });
+                        }
+                    } else if (child.nodeType === Node.ELEMENT_NODE) {
+                        const tag = child.tagName.toLowerCase();
+
+                        if (tag === 'img') {
+                            const src = child.getAttribute('src');
+                            if (src && src.startsWith('data:')) {
+                                blocks.push({ type: 'image', src });
+                            }
+                            continue;
+                        }
+
+                        if (tag === 'br') {
+                            blocks.push({ type: 'text', text: '', tag: 'br' });
+                            continue;
+                        }
+
+                        // Skip script/style
+                        if (tag === 'script' || tag === 'style' || tag === 'link') continue;
+
+                        if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
+                            const text = child.textContent.trim();
+                            if (text) {
+                                blocks.push({ type: 'heading', text, tag });
+                            }
+                        } else if (tag === 'p' || tag === 'div' || tag === 'blockquote' || tag === 'section' || tag === 'article') {
+                            // Check if this block contains images mixed with text
+                            const imgs = child.querySelectorAll('img');
+                            if (imgs.length > 0) {
+                                // Walk children to preserve order
+                                walkNodes(child);
+                            } else {
+                                const text = child.textContent.trim();
+                                if (text) {
+                                    blocks.push({ type: 'text', text, tag: tag === 'blockquote' ? 'blockquote' : 'p' });
+                                }
+                            }
+                        } else if (tag === 'ul' || tag === 'ol') {
+                            const items = child.querySelectorAll('li');
+                            items.forEach((li, idx) => {
+                                const prefix = tag === 'ol' ? `${idx + 1}. ` : '  - ';
+                                const text = li.textContent.trim();
+                                if (text) {
+                                    blocks.push({ type: 'text', text: prefix + text, tag: 'li' });
+                                }
+                            });
+                        } else if (tag === 'hr') {
+                            blocks.push({ type: 'hr' });
+                        } else if (tag === 'table') {
+                            // Simple table extraction as text
+                            const rows = child.querySelectorAll('tr');
+                            rows.forEach(row => {
+                                const cells = row.querySelectorAll('td, th');
+                                const rowText = Array.from(cells).map(c => c.textContent.trim()).join('  |  ');
+                                if (rowText.trim()) {
+                                    blocks.push({ type: 'text', text: rowText, tag: 'p' });
+                                }
+                            });
+                        } else {
+                            // Recurse into other elements (span, em, strong, a, etc.)
+                            walkNodes(child);
+                        }
+                    }
+                }
+            }
+
+            walkNodes(doc.body.firstChild || doc.body);
+            return blocks;
+        }
+
+        async function convertEpubTextMode(pdf, chapters, pageSize, margin, baseFontSize, lineHeight) {
+            const contentWidth = pageSize.width - (margin * 2);
+            const contentHeight = pageSize.height - (margin * 2);
+            let cursorY = margin;
+            let isFirstPage = true;
+
+            const fontSizes = {
+                h1: baseFontSize * 1.8,
+                h2: baseFontSize * 1.5,
+                h3: baseFontSize * 1.3,
+                h4: baseFontSize * 1.15,
+                h5: baseFontSize * 1.05,
+                h6: baseFontSize,
+                p: baseFontSize,
+                li: baseFontSize,
+                blockquote: baseFontSize * 0.95,
+                br: baseFontSize
+            };
+
+            const lineHeightMm = baseFontSize * 0.3528 * lineHeight; // pt to mm * line height
+
+            function addNewPage() {
+                pdf.addPage([pageSize.width, pageSize.height]);
+                cursorY = margin;
+            }
+
+            function ensureSpace(needed) {
+                if (cursorY + needed > pageSize.height - margin) {
+                    addNewPage();
+                    return true;
+                }
+                return false;
+            }
+
+            function writeTextBlock(text, fSize, isBold, indent) {
+                const indentMm = indent || 0;
+                const availWidth = contentWidth - indentMm;
+                pdf.setFontSize(fSize);
+                pdf.setFont('helvetica', isBold ? 'bold' : 'normal');
+
+                // Split text into lines that fit within the available width
+                const lines = pdf.splitTextToSize(text, availWidth);
+                const blockLineHeight = fSize * 0.3528 * lineHeight;
+
+                for (const line of lines) {
+                    ensureSpace(blockLineHeight);
+                    pdf.text(line, margin + indentMm, cursorY);
+                    cursorY += blockLineHeight;
+                }
+            }
+
+            for (let i = 0; i < chapters.length; i++) {
+                updateEpubProgress(
+                    20 + (i / chapters.length * 70),
+                    `Processing chapter ${i + 1} of ${chapters.length}...`
+                );
+
+                const blocks = extractContentBlocks(chapters[i]);
+
+                for (const block of blocks) {
+                    if (block.type === 'heading') {
+                        const fSize = fontSizes[block.tag] || baseFontSize;
+                        // Add space before heading
+                        const headingSpace = fSize * 0.3528 * 1.5;
+                        ensureSpace(headingSpace + lineHeightMm);
+                        cursorY += headingSpace * 0.5;
+                        writeTextBlock(block.text, fSize, true, 0);
+                        cursorY += lineHeightMm * 0.3;
+
+                    } else if (block.type === 'text') {
+                        if (block.tag === 'br') {
+                            cursorY += lineHeightMm * 0.5;
+                            continue;
+                        }
+                        const fSize = fontSizes[block.tag] || baseFontSize;
+                        const indent = block.tag === 'blockquote' ? 10 : (block.tag === 'li' ? 5 : 0);
+                        writeTextBlock(block.text, fSize, false, indent);
+                        cursorY += lineHeightMm * 0.3; // paragraph spacing
+
+                    } else if (block.type === 'image') {
+                        try {
+                            // Determine image format from data URI
+                            const formatMatch = block.src.match(/^data:image\/(jpeg|jpg|png|gif|webp);base64,/i);
+                            if (!formatMatch) continue;
+
+                            let imgFormat = formatMatch[1].toUpperCase();
+                            if (imgFormat === 'JPG') imgFormat = 'JPEG';
+
+                            // Only JPEG and PNG are supported by jsPDF
+                            if (imgFormat !== 'JPEG' && imgFormat !== 'PNG') continue;
+
+                            // Get image dimensions by loading into an Image element
+                            const imgDims = await getImageDimensions(block.src);
+                            if (!imgDims) continue;
+
+                            // Scale image to fit content width, cap height
+                            let imgWidthMm = Math.min(contentWidth, imgDims.width * 0.2646); // px to mm
+                            let imgHeightMm = imgWidthMm * (imgDims.height / imgDims.width);
+
+                            // Cap to half page height
+                            const maxHeight = contentHeight * 0.5;
+                            if (imgHeightMm > maxHeight) {
+                                imgHeightMm = maxHeight;
+                                imgWidthMm = imgHeightMm * (imgDims.width / imgDims.height);
+                            }
+
+                            ensureSpace(imgHeightMm + lineHeightMm);
+
+                            // Center the image
+                            const imgX = margin + (contentWidth - imgWidthMm) / 2;
+                            pdf.addImage(block.src, imgFormat, imgX, cursorY, imgWidthMm, imgHeightMm);
+                            cursorY += imgHeightMm + lineHeightMm * 0.5;
+
+                        } catch (imgError) {
+                            console.warn('Skipping image:', imgError);
+                        }
+
+                    } else if (block.type === 'hr') {
+                        ensureSpace(lineHeightMm * 2);
+                        cursorY += lineHeightMm * 0.5;
+                        pdf.setDrawColor(180, 180, 180);
+                        pdf.setLineWidth(0.3);
+                        pdf.line(margin, cursorY, margin + contentWidth, cursorY);
+                        cursorY += lineHeightMm;
+                    }
+                }
+
+                // Small gap between chapters
+                cursorY += lineHeightMm;
+            }
+        }
+
+        function getImageDimensions(src) {
+            return new Promise(resolve => {
+                const img = new Image();
+                img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+                img.onerror = () => resolve(null);
+                img.src = src;
+            });
+        }
+
+        // ---- Image-based rendering (preserves layout) ----
+
+        async function convertEpubImageMode(pdf, chapters, pageSize, margin, fontSize, lineHeight, quality) {
+            const contentWidthMm = pageSize.width - (margin * 2);
+            const contentHeightMm = pageSize.height - (margin * 2);
+            const contentWidthPx = Math.round(contentWidthMm * 3.78);
+
+            const renderContainer = epubElements.renderContainer;
+            renderContainer.style.width = contentWidthPx + 'px';
+            renderContainer.style.fontSize = fontSize + 'pt';
+            renderContainer.style.lineHeight = String(lineHeight);
+            renderContainer.style.padding = '20px';
+
+            // Use lower scale for smaller file sizes (1.25 instead of 2)
+            const canvasScale = quality >= 0.8 ? 1.5 : 1.25;
+
+            let isFirstPage = true;
+
+            for (let i = 0; i < chapters.length; i++) {
+                updateEpubProgress(
+                    20 + (i / chapters.length * 70),
+                    `Rendering chapter ${i + 1} of ${chapters.length}...`
+                );
+
+                renderContainer.innerHTML = chapters[i];
+
+                // Wait for images to load
+                const imgs = renderContainer.querySelectorAll('img');
+                if (imgs.length > 0) {
+                    await Promise.all(Array.from(imgs).map(img => {
+                        if (img.complete) return Promise.resolve();
+                        return new Promise(resolve => {
+                            img.onload = resolve;
+                            img.onerror = resolve;
+                        });
+                    }));
+                }
+
+                await new Promise(resolve => setTimeout(resolve, 50));
+
+                const canvas = await html2canvas(renderContainer, {
+                    scale: canvasScale,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    logging: false
+                });
+
+                const scaleFactor = contentWidthMm / canvas.width;
+                const canvasHeightMm = canvas.height * scaleFactor;
+                const totalPages = Math.ceil(canvasHeightMm / contentHeightMm);
+
+                for (let p = 0; p < totalPages; p++) {
+                    if (!isFirstPage) {
+                        pdf.addPage([pageSize.width, pageSize.height]);
+                    }
+                    isFirstPage = false;
+
+                    const sliceHeightPx = contentHeightMm / scaleFactor;
+                    const sourceY = p * sliceHeightPx;
+                    const sourceHeight = Math.min(sliceHeightPx, canvas.height - sourceY);
+
+                    if (sourceHeight <= 0) break;
+
+                    const sliceCanvas = document.createElement('canvas');
+                    sliceCanvas.width = canvas.width;
+                    sliceCanvas.height = Math.ceil(sourceHeight);
+
+                    const sliceCtx = sliceCanvas.getContext('2d');
+                    sliceCtx.fillStyle = '#ffffff';
+                    sliceCtx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+                    sliceCtx.drawImage(
+                        canvas,
+                        0, sourceY, canvas.width, sourceHeight,
+                        0, 0, canvas.width, sourceHeight
+                    );
+
+                    const imgData = sliceCanvas.toDataURL('image/jpeg', quality);
+                    const imgHeightMm = sourceHeight * scaleFactor;
+
+                    pdf.addImage(
+                        imgData,
+                        'JPEG',
+                        margin,
+                        margin,
+                        contentWidthMm,
+                        imgHeightMm
+                    );
+                }
+            }
+
+            // Clean up
+            renderContainer.innerHTML = '';
         }
 
         // Initialize the application when the DOM is loaded
